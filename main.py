@@ -1,10 +1,12 @@
 from fastapi import FastAPI, HTTPException, status, Depends
-from routes import personagens_router, usuario_router #faz com que o FASTAPI importe as rotas
 from typing import Optional, Any
+from model import Personagem
 
-app = FastAPI(title="Super Mario Bros 3", version="0.0.1", description="Confira abaixo os personagens do jogo Super Mario Bros 3")
-
-app.include_router(personagens_router.router, tags=['personagens']) #faz com que seja incluido as rotas 
+app = FastAPI(
+    title="Super Mario Bros 3", 
+    version="0.0.1", 
+    description="Confira abaixo os personagens do jogo Super Mario Bros 3"
+    )
 
 def fake_db():
     try:
@@ -59,7 +61,7 @@ personagens = { #foi criado um json para funcionar como armazenamento
         "imagem" : "https://github.com/AkiraSunsets/API-Super-Mario-Bros-3/blob/main/Mario%20Characters/koopa.troopa.jpg"
     },
 
-        5: {
+    6: {
         "nome" : "Toad",
         "tipo" : "NPC",
         "vida" : None,
@@ -70,25 +72,67 @@ personagens = { #foi criado um json para funcionar como armazenamento
 
 }
 
-@app.get("/")
-async def raiz():
-    return{"API - Personagens Super Mario Bros 3"} #funciona como o main
+#CREATE
+@app.post("/personagens", response_model=Personagem, status_code=status.HTTP_201_CREATED, tags=["Personagens: "], summary="Criar novo personagem")
+async def criar_personagem(personagem: Personagem):
+    if personagem.id in personagens:
+        raise HTTPException(status_code=400, detail="ID já existe")
+    
+    #converte o objeto Pydantic em dicionário e salva no "banco"
+    personagens[personagem.id] = personagem.dict() 
+    return personagem
+#=============================================================
 
-@app.get("/personagens") #categoria com nome opcional
+#read all
+@app.get("/personagens", tags=["Personagens: "], summary="Listar todos os personagens da API") #categoria com nome opcional
 async def get_personagens(db: Any = Depends(fake_db)): #verifica se há pelo menos um item verdadeiro
     return personagens
 
-@app.get("/personagens/{personagem_id}", description="Retorna um personagem com um id especifico")
+#read one
+@app.get("/personagens/{personagem_id}", description="Retorna um personagem com um id especifico", tags=["Personagens: "], summary="Pesquisa pela o ID")
 async def get_personagem(personagem_id: int): #usado no singular para realizar uma busca de um unico id
     try:
         personagem = personagens[personagem_id] 
         return personagem
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Este personagem não foi encontrado")
+#===================================================================
+
+#UPDATE
+@app.put("/personagens/{personagem_id}", response_model=Personagem, tags=["Personagens: "], summary= "Atualiza personagem")
+async def atualizar_personagem(personagem_id: int, personagem: Personagem):
+
+    #Se o personagem não existir no banco, tem como atualizar
+    if personagem_id not in personagens:
+        raise HTTPException(status_code=404, detail="Personagem não encontrado")
     
 
+    #substitui o personagem antigo pelos novos dados
+    personagens[personagem_id] = personagem.dict()
+
+    #retorna o personagem atualizado
+    return personagem
+#=============================================================
+
+#DELETE
+@app.delete ("/personagens/{personagem_id}", status_code=status.HTTP_200_OK, tags=["Personagens: "], summary="Deletar personagens")
+async def deletar_personagens(personagem_id: int):
+
+    #verifica se o personagem existe
+
+    if personagem_id not in personagens:
+        raise HTTPException(status_code=404, detail="Personagem não encontrado")
+    
+
+    #remove o personagem
+    del personagens[personagem_id]
+
+    #return messagem de sucesso
+    return {"msg": "Personagem deletado com sucesso"}
+
+
+#===========================RUN=====================================
 if __name__ == '__main__':
     import uvicorn #é usado para que se houver a necessidade 
                    #de realizar alguma alteração de alguma informação na execução do código
-    uvicorn.run("main:app", host="127.0.0.1", port=8002, reload=True)
-
+    uvicorn.run("main:app", host="127.0.0.1", port=8003, reload=True)
